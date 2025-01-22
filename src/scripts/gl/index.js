@@ -15,8 +15,12 @@ import fullScreenVertex from './shaders/fullscreen.vert';
 import fullScreenFragment from './shaders/fullscreen.frag';
 
 import { getRandomSpherePoint } from '../utils';
-
-import GUI from '../gui';
+const POINT_SIZE = 1.0;
+const SPEED = 0.4;
+const CURL_FREQ = 0.74;
+const OPACITY = 0.25;
+const AMPLITUDE_VERTICALE = 0.05;
+const SPEED_LEVITATION = 1;
 
 export default new class {
   constructor() {
@@ -52,7 +56,6 @@ export default new class {
   init() {
     this.addCanvas();
     this.addEvents();
-    this.setGui();
     this.createFBO();
     this.createScreenQuad();
   }
@@ -66,29 +69,6 @@ export default new class {
   addEvents() {
     Events.on('tick', this.render.bind(this));
     Events.on('resize', this.resize.bind(this));
-  }
-
-  setGui() {
-    this.tweaks = {
-      pointSize: 1.2,
-      speed: 0.3,
-      curlFreq: 0.25,
-      opacity: 0.35,
-    };
-
-    GUI.add(this.tweaks, 'pointSize', 1, 3, 0.1)
-       .name('particle size')
-       .onChange(() => this.renderMaterial.uniforms.uPointSize.value = this.tweaks.pointSize);
-
-    GUI.add(this.tweaks, 'speed', 0.0, 1, 0.001)
-       .onChange(() => this.simMaterial.uniforms.uSpeed.value = this.tweaks.speed);
-
-    GUI.add(this.tweaks, 'curlFreq', 0, 0.6, 0.01)
-       .name('noise frequency')
-       .onChange(() => this.simMaterial.uniforms.uCurlFreq.value = this.tweaks.curlFreq);
-
-    GUI.add(this.tweaks, 'opacity', 0.1, 1.0, 0.01)
-       .onChange(() => this.renderMaterial.uniforms.uOpacity.value = this.tweaks.opacity);
   }
 
   createFBO() {
@@ -105,12 +85,6 @@ export default new class {
       data[i + 0] = point.x;
       data[i + 1] = point.y;
       data[i + 2] = point.z;      
-
-      // // Replaced with this if you want 
-      // // random positions inside a cube
-      // data[i + 0] = Math.random() - 0.5;
-      // data[i + 1] = Math.random() - 0.5;
-      // data[i + 2] = Math.random() - 0.5;      
     }
 
     // Convert the data to a FloatTexture
@@ -124,8 +98,8 @@ export default new class {
       uniforms: {
         positions: { value: positions },
         uTime: { value: 0 },
-        uSpeed: { value: this.tweaks.speed },
-        uCurlFreq: { value: this.tweaks.curlFreq },
+        uSpeed: { value: SPEED }, // Fixed value for speed
+        uCurlFreq: { value: CURL_FREQ }, // Fixed value for noise frequency
       },
     });
 
@@ -137,8 +111,8 @@ export default new class {
       uniforms: {
         positions: { value: null },
         uTime: { value: 0 },
-        uPointSize: { value: this.tweaks.pointSize },
-        uOpacity: { value: this.tweaks.opacity },
+        uPointSize: { value: POINT_SIZE }, // Fixed value for particle size
+        uOpacity: { value: OPACITY }, // Fixed value for opacity
       },
       transparent: true,
       blending: THREE.AdditiveBlending
@@ -186,7 +160,12 @@ export default new class {
     this.time = this.clock.getElapsedTime();
 
     this.fbo.update(this.time);
-
+    // Rotation de la sphère
+    this.fbo.particles.rotation.y += 0.002; 
+    // Lévitation de la sphère
+    const amplitude = AMPLITUDE_VERTICALE; // Amplitude du mouvement vertical
+    const speed = SPEED_LEVITATION; // Vitesse de la lévitation
+    this.fbo.particles.position.y = Math.sin(this.time * speed) * amplitude;
     this.fullScreenQuad.material.uniforms.uTime.value = this.time;
 
     this.renderer.render(this.scene, this.camera);
