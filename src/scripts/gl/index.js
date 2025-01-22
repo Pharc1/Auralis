@@ -58,6 +58,7 @@ export default new class {
     this.addEvents();
     this.createFBO();
     this.createScreenQuad();
+    this.initAudio(); // Initialisation de l’audio
   }
 
   addCanvas() {
@@ -100,6 +101,8 @@ export default new class {
         uTime: { value: 0 },
         uSpeed: { value: SPEED }, // Fixed value for speed
         uCurlFreq: { value: CURL_FREQ }, // Fixed value for noise frequency
+        uAudioData: { value: new Array(256).fill(0) },
+        uAudioAmplitude: { value: 0 },
       },
     });
 
@@ -113,6 +116,8 @@ export default new class {
         uTime: { value: 0 },
         uPointSize: { value: POINT_SIZE }, // Fixed value for particle size
         uOpacity: { value: OPACITY }, // Fixed value for opacity
+        uAudioData: { value: new Array(256).fill(0) }, // Uniforme pour les fréquences audio
+        uAudioAmplitude: { value: 0 }, // Uniforme pour l'amplitude audio
       },
       transparent: true,
       blending: THREE.AdditiveBlending
@@ -169,5 +174,62 @@ export default new class {
     this.fullScreenQuad.material.uniforms.uTime.value = this.time;
 
     this.renderer.render(this.scene, this.camera);
+  }
+
+  initAudio() {
+    // Initialiser le contexte audio
+  
+    document.body.addEventListener('click', () => { // Utilisation d'une fonction fléchée ici
+      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      this.analyserNode = this.audioContext.createAnalyser();
+      this.analyserNode.fftSize = 256; // Taille de la FFT
+      this.frequencyData = new Uint8Array(this.analyserNode.frequencyBinCount);
+  
+      // Capturer l’audio du navigateur
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+        console.log('Microphone capturé avec succès !');
+        const source = this.audioContext.createMediaStreamSource(stream);
+        source.connect(this.analyserNode);
+  
+        // Commence la mise à jour des fréquences audio
+        this.updateAudio(); // Maintenant, `this` fait référence au bon objet
+      }).catch(error => {
+        console.error('Erreur de capture audio :', error);
+      });
+    });
+  }
+  
+  updateAudio() {
+    this.analyserNode.getByteFrequencyData(this.frequencyData);
+    const maxAmplitude = Math.max(...this.frequencyData) / 255.0;
+    console.log('Max Amplitude:', maxAmplitude);
+    
+    // Seuil de l'amplitude pour activer l'effet
+    const threshold = 0.2; // Définir un seuil arbitraire (tu peux ajuster cette valeur)
+  
+    // Si l'amplitude dépasse le seuil, on met à jour les uniformes
+    if (maxAmplitude > threshold) {
+      // Mettre à jour l'uniforme pour l'amplitude
+      if (this.simMaterial.uniforms.uAudioAmplitude) {
+        this.simMaterial.uniforms.uAudioAmplitude.value = maxAmplitude;
+      }
+  
+      // Créer la texture audio et la passer aux shaders
+      const audioTexture = new THREE.DataTexture(
+        this.frequencyData,
+        this.frequencyData.length,
+        1,
+        THREE.RedFormat,
+        THREE.UnsignedByteType
+      );
+      audioTexture.needsUpdate = true;
+  
+      if (this.simMaterial.uniforms.uAudioData) {
+        this.simMaterial.uniforms.uAudioData.value = audioTexture;
+      }
+    }
+    
+    // Demander à la fonction de s'appeler à la prochaine frame
+    requestAnimationFrame(this.updateAudio.bind(this));
   }
 }
