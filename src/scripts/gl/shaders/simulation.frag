@@ -2,6 +2,8 @@ uniform sampler2D positions; // Data Texture containing original positions
 uniform float uTime;
 uniform float uSpeed;
 uniform float uCurlFreq;
+uniform sampler2D uAudioData; // Si les données audio sont passées comme texture
+uniform float uAudioAmplitude;
 
 varying vec2 vUv;
 
@@ -33,6 +35,10 @@ void main() {
 
   vec2 uv = vUv;
 
+  float audioStrength = texture2D(uAudioData, vec2(uv.x, 0.0)).r; // Exemple si uAudioData est une texture 1D
+  float curlModulation = mix(0.5, 2.0, audioStrength); // Amplification basée sur l'audio
+
+  
   vec3 pos = texture2D(positions, uv).rgb; // basic simulation: displays the particles in place.
   vec3 curlPos = texture2D(positions, uv).rgb;
   vec3 finalPos = vec3(0.0);
@@ -41,9 +47,15 @@ void main() {
   // pos = rotate(pos, vec3(0.0, 0.0, 1.0), t + sin(length(pos.xy) * 2.0 + PI * 0.5) * 10.0);
   // pos = rotate(pos, vec3(1.0, 0.0, 0.0), -t);
   // pos.z += tan(length(length(pos.xy) * 10.0) - t) * 1.0;
-  pos = curl(pos * uCurlFreq + t);
+  // Modifier la position en fonction de l'amplitude
+  pos = curl(pos * (uCurlFreq) + t) * (1.0);
 
-  curlPos = curl(curlPos * uCurlFreq + t);
+
+
+  // Appliquer l'amplitude sur curlPos
+  curlPos = curl(curlPos * (uCurlFreq) + t) * (1.0 + uAudioAmplitude);
+
+
   // if you uncomment the next noise additions
   // you'll get very pleasing flocking particles
   // inside the bounds of a sphere
